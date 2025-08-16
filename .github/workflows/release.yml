@@ -14,6 +14,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Create Release
         uses: actions/create-release@v1
@@ -42,8 +44,8 @@ jobs:
       - name: Update major version tag
         run: |
           VERSION=${{ github.ref_name }}
-          MAJOR_VERSION=$(echo $VERSION | cut -d. -f1)
-          git config user.name github-actions
-          git config user.email github-actions@github.com
-          git tag -fa $MAJOR_VERSION -m "Update $MAJOR_VERSION tag"
-          git push origin $MAJOR_VERSION --force
+          MAJOR_VERSION=$(echo "$VERSION" | cut -d. -f1)
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -fa "$MAJOR_VERSION" -m "Update $MAJOR_VERSION tag"
+          git push origin "$MAJOR_VERSION" --force
