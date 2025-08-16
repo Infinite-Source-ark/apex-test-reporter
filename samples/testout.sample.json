@@ -1,0 +1,43 @@
+{
+  "status": 0,
+  "result": {
+    "summary": {
+      "testsRan": 4,
+      "passing": 3,
+      "failing": 1,
+      "skipped": 0,
+      "testRunCoverage": 87,
+      "outcome": "Completed"
+    },
+    "tests": [
+      {
+        "apexClass": { "fullName": "AccountServiceTest" },
+        "methodName": "testHappyPath",
+        "outcome": "Pass",
+        "message": null,
+        "stackTrace": null
+      },
+      {
+        "apexClass": { "fullName": "AccountServiceTest" },
+        "methodName": "testEdgeCase",
+        "outcome": "Pass",
+        "message": null,
+        "stackTrace": null
+      },
+      {
+        "apexClass": { "fullName": "ContactServiceTest" },
+        "methodName": "testBulkInsert",
+        "outcome": "Pass",
+        "message": null,
+        "stackTrace": null
+      },
+      {
+        "apexClass": { "fullName": "OpportunityServiceTest" },
+        "methodName": "testFailure",
+        "outcome": "Fail",
+        "message": "System.AssertException: Assertion Failed",
+        "stackTrace": "Class.OpportunityServiceTest.testFailure: line 42, column 1"
+      }
+    ]
+  }
+}

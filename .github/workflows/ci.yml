@@ -1,0 +1,35 @@
+name: CI (Action Sanity)
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test-action:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      # Run this action against the sample JSON
+      - name: Run reporter (sample)
+        id: apex
+        uses: ./
+        with:
+          json_path: samples/testout.sample.json
+          check_name: "Apex Tests (Sample)"
+          min_coverage: "85"
+
+      - name: Verify outputs
+        run: |
+          echo "Coverage: ${{ steps.apex.outputs.coverage }}"
+          echo "Failing:  ${{ steps.apex.outputs.failing }}"
+          echo "Total:    ${{ steps.apex.outputs.total }}"
+          echo "Outcome:  ${{ steps.apex.outputs.outcome }}"
+          test -f "${{ steps.apex.outputs.summary_file }}" || (echo "summary file missing" && exit 1)

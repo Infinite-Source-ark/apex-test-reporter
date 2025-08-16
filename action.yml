@@ -1,0 +1,47 @@
+name: "Apex JSON Test Reporter"
+description: "Parse Salesforce CLI Apex JSON results and publish a summary + outputs"
+author: "Your Name"
+branding:
+  icon: "check-square"
+  color: "green"
+
+inputs:
+  json_path:
+    description: "Path to JSON produced by 'sf apex test run -r json'"
+    required: true
+  check_name:
+    description: "Display name for the summary"
+    required: false
+    default: "Apex Tests"
+  min_coverage:
+    description: "Coverage threshold (%) shown in the summary (does not fail the action)"
+    required: false
+    default: "85"
+
+outputs:
+  coverage:
+    description: "Org-wide coverage (percent)"
+    value: ${{ steps.parse.outputs.coverage }}
+  failing:
+    description: "Number of failing tests"
+    value: ${{ steps.parse.outputs.failing }}
+  total:
+    description: "Total tests run"
+    value: ${{ steps.parse.outputs.total }}
+  outcome:
+    description: "Overall outcome reported by SF CLI"
+    value: ${{ steps.parse.outputs.outcome }}
+  summary_file:
+    description: "Path to generated markdown summary"
+    value: ${{ steps.parse.outputs.summary_file }}
+
+runs:
+  using: "composite"
+  steps:
+    - id: parse
+      shell: bash
+      run: $GITHUB_ACTION_PATH/parse-and-publish.sh
+      env:
+        JSON_PATH: ${{ inputs.json_path }}
+        CHECK_NAME: ${{ inputs.check_name }}
+        MIN_COVERAGE: ${{ inputs.min_coverage }}
