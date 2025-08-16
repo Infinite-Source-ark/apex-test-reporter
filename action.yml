@@ -1,47 +1,62 @@
-name: "Apex JSON Test Reporter"
-description: "Parse Salesforce CLI Apex JSON results and publish a summary + outputs"
-author: "Your Name"
+name: "Apex Test Reporter"
+description: "Parse Salesforce CLI Apex test results and generate readable GitHub Actions job summaries"
+author: "uttam"
 branding:
-  icon: "check-square"
+  icon: "check-circle"
   color: "green"
 
 inputs:
   json_path:
-    description: "Path to JSON produced by 'sf apex test run -r json'"
+    description: "Path to JSON from 'sf apex test run -r json'"
     required: true
   check_name:
-    description: "Display name for the summary"
+    description: "Display name"
     required: false
     default: "Apex Tests"
   min_coverage:
-    description: "Coverage threshold (%) shown in the summary (does not fail the action)"
+    description: "Coverage threshold to display"
     required: false
     default: "85"
+  max_failures:
+    description: "Max failure entries to show (for huge runs)"
+    required: false
+    default: "50"
 
 outputs:
-  coverage:
-    description: "Org-wide coverage (percent)"
-    value: ${{ steps.parse.outputs.coverage }}
+  tests-ran:
+    description: "Total number of tests executed"
+    value: ${{ steps.parse.outputs.tests-ran }}
+  passing:
+    description: "Number of passing tests"
+    value: ${{ steps.parse.outputs.passing }}
   failing:
     description: "Number of failing tests"
     value: ${{ steps.parse.outputs.failing }}
-  total:
-    description: "Total tests run"
-    value: ${{ steps.parse.outputs.total }}
+  skipped:
+    description: "Number of skipped tests"
+    value: ${{ steps.parse.outputs.skipped }}
+  coverage:
+    description: "Test coverage percentage"
+    value: ${{ steps.parse.outputs.coverage }}
   outcome:
-    description: "Overall outcome reported by SF CLI"
+    description: "Overall test run outcome (Passed/Failed)"
     value: ${{ steps.parse.outputs.outcome }}
-  summary_file:
-    description: "Path to generated markdown summary"
-    value: ${{ steps.parse.outputs.summary_file }}
+  summary-file:
+    description: "Path to generated markdown summary file"
+    value: ${{ steps.parse.outputs.summary-file }}
+  # Legacy outputs for backward compatibility
+  total:
+    description: "Total tests run (legacy - use tests-ran)"
+    value: ${{ steps.parse.outputs.total }}
 
 runs:
   using: "composite"
   steps:
     - id: parse
       shell: bash
-      run: $GITHUB_ACTION_PATH/scripts/parse-and-publish.sh
+      run: bash "$GITHUB_ACTION_PATH/scripts/parse-and-publish.sh"
       env:
         JSON_PATH: ${{ inputs.json_path }}
         CHECK_NAME: ${{ inputs.check_name }}
         MIN_COVERAGE: ${{ inputs.min_coverage }}
+        MAX_FAILURES: ${{ inputs.max_failures }}

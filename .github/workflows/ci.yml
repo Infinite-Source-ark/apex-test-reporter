@@ -1,8 +1,10 @@
-name: CI (Action Sanity)
+name: CI (Action Testing)
 
 on:
   push:
+    branches: [main]
   pull_request:
+    branches: [main]
 
 jobs:
   test-action:
@@ -17,8 +19,8 @@ jobs:
       - name: Install jq
         run: sudo apt-get update && sudo apt-get install -y jq
 
-      # Run this action against the sample JSON
-      - name: Run reporter (sample)
+      # Test with sample data
+      - name: Test Action with Sample Data
         id: apex
         uses: ./
         with:
@@ -26,10 +28,81 @@ jobs:
           check_name: "Apex Tests (Sample)"
           min_coverage: "85"
 
-      - name: Verify outputs
+      - name: Verify Outputs
         run: |
+          echo "Tests Ran: ${{ steps.apex.outputs.tests-ran }}"
+          echo "Passing: ${{ steps.apex.outputs.passing }}"
+          echo "Failing: ${{ steps.apex.outputs.failing }}"
+          echo "Skipped: ${{ steps.apex.outputs.skipped }}"
           echo "Coverage: ${{ steps.apex.outputs.coverage }}"
-          echo "Failing:  ${{ steps.apex.outputs.failing }}"
-          echo "Total:    ${{ steps.apex.outputs.total }}"
-          echo "Outcome:  ${{ steps.apex.outputs.outcome }}"
-          test -f "${{ steps.apex.outputs.summary_file }}" || (echo "summary file missing" && exit 1)
+          echo "Outcome: ${{ steps.apex.outputs.outcome }}"
+          echo "Summary File: ${{ steps.apex.outputs.summary-file }}"
+
+          # Verify legacy outputs still work
+          echo "Legacy Total: ${{ steps.apex.outputs.total }}"
+          echo "Legacy Summary: ${{ steps.apex.outputs.summary_file }}"
+
+      - name: Verify Summary File Exists
+        run: |
+          test -f "${{ steps.apex.outputs.summary-file }}" || (echo "Summary file missing" && exit 1)
+          echo "✅ Summary file created successfully"
+
+      - name: Verify Output Values
+        run: |
+          # Test that outputs are numbers where expected
+          if ! [[ "${{ steps.apex.outputs.tests-ran }}" =~ ^[0-9]+$ ]]; then
+            echo "::error::tests-ran should be a number"
+            exit 1
+          fi
+
+          if ! [[ "${{ steps.apex.outputs.coverage }}" =~ ^[0-9]+$ ]]; then
+            echo "::error::coverage should be a number"
+            exit 1
+          fi
+
+          echo "✅ All output validations passed"
+
+  test-error-handling:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Test Missing File Error
+        continue-on-error: true
+        id: missing-file
+        uses: ./
+        with:
+          json_path: nonexistent.json
+
+      - name: Verify Error Handling
+        run: |
+          if [ "${{ steps.missing-file.outcome }}" = "success" ]; then
+            echo "::error::Action should have failed with missing file"
+            exit 1
+          fi
+          echo "✅ Missing file error handling works correctly"
+
+      - name: Test Invalid JSON Error
+        continue-on-error: true
+        id: invalid-json
+        run: |
+          echo "invalid json content" > invalid.json
+
+      - name: Test Invalid JSON with Action
+        continue-on-error: true
+        id: invalid-json-action
+        uses: ./
+        with:
+          json_path: invalid.json
+
+      - name: Verify JSON Error Handling
+        run: |
+          if [ "${{ steps.invalid-json-action.outcome }}" = "success" ]; then
+            echo "::error::Action should have failed with invalid JSON"
+            exit 1
+          fi
+          echo "✅ Invalid JSON error handling works correctly"

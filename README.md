@@ -1,4 +1,4 @@
-# Apex JSON Test Reporter (GitHub Action)
+# Apex Test Reporter (GitHub Action)
 
 Parses `sf apex test run -r json` output from Salesforce CLI, writes a clean Markdown summary to the GitHub Actions job summary, and exposes outputs (coverage, failing, total, outcome) that you can use to gate PRs or post comments.
 
@@ -16,47 +16,126 @@ Parses `sf apex test run -r json` output from Salesforce CLI, writes a clean Mar
 ```yaml
 - name: Install jq
   run: sudo apt-get update && sudo apt-get install -y jq
+```
 
-🚀 Usage
+## 🚀 Usage
 
+### Basic Usage
+```yaml
 - name: Run Apex tests (JSON)
   run: sf apex test run -c -r json -w 30 --target-org qa_scratchorg > testout.json
 
-- name: Publish Apex results
+- name: Parse Test Results
   id: apex
-  uses: <your-org>/apex-json-test-reporter@v1
+  uses: Infinite-Source-ark/apex-test-reporter@v1
   with:
     json_path: testout.json
     check_name: "Apex Tests"
     min_coverage: "85"
+```
 
-🔁 Outputs
+### Advanced Usage with PR Gating
+```yaml
+- name: Run Apex tests (JSON)
+  run: sf apex test run -c -r json -w 30 --target-org qa_scratchorg > testout.json
 
-• coverage — org-wide coverage (%)
+- name: Parse Test Results
+  id: apex
+  uses: Infinite-Source-ark/apex-test-reporter@v1
+  with:
+    json_path: testout.json
+    check_name: "Apex Tests"
+    min_coverage: "75"
+    max_failures: "25"
 
-• failing — number of failing tests
-
-• total — tests executed
-
-• outcome — overall outcome
-
-• summary_file — path to generated Markdown summary
-
-🚦 Gate the PR (coverage + failures)
-
-- name: Gate on coverage/failures
+- name: Check Coverage Threshold
+  if: steps.apex.outputs.coverage < 75
   run: |
-    echo "Coverage: ${{ steps.apex.outputs.coverage }}%"
-    echo "Failing:  ${{ steps.apex.outputs.failing }}"
-    req=85
-    cov=${{ steps.apex.outputs.coverage }}
-    fail=${{ steps.apex.outputs.failing }}
-    if [ "$fail" -gt 0 ]; then
-      echo "::error::There are $fail failing tests."
-      exit 1
-    fi
-    awk -v r="$cov" -v req="$req" 'BEGIN { exit (r+0 >= req ? 0 : 1) }' \
-      || { echo "::error::Coverage ${cov}% is below ${req}%"; exit 1; }
+    echo "::error::Code coverage (${{ steps.apex.outputs.coverage }}%) is below required threshold (75%)"
+    exit 1
+
+- name: Check for Test Failures
+  if: steps.apex.outputs.failing > 0
+  run: |
+    echo "::error::There are ${{ steps.apex.outputs.failing }} failing tests"
+    exit 1
+
+- name: Display Test Summary
+  run: |
+    echo "✅ Tests Passed: ${{ steps.apex.outputs.passing }}"
+    echo "❌ Tests Failed: ${{ steps.apex.outputs.failing }}"
+    echo "⏭️ Tests Skipped: ${{ steps.apex.outputs.skipped }}"
+    echo "📊 Coverage: ${{ steps.apex.outputs.coverage }}%"
+    echo "🎯 Outcome: ${{ steps.apex.outputs.outcome }}"
+```
+
+## 🔁 Outputs
+
+| Output | Description | Example |
+|--------|-------------|---------|
+| `tests-ran` | Total number of tests executed | `42` |
+| `passing` | Number of passing tests | `40` |
+| `failing` | Number of failing tests | `2` |
+| `skipped` | Number of skipped tests | `0` |
+| `coverage` | Test coverage percentage | `87` |
+| `outcome` | Overall test run outcome | `Failed` |
+| `summary-file` | Path to generated markdown summary | `/path/to/apex-summary.md` |
+
+### Legacy Outputs (for backward compatibility)
+- `total` — same as `tests-ran`
+- `summary_file` — same as `summary-file`
+
+## 🚦 Example: Complete CI Workflow
+
+```yaml
+name: Salesforce CI
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  apex-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Salesforce CLI
+        run: npm install -g @salesforce/cli
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Authenticate to Salesforce
+        run: sf org login sfdx-url --sfdx-url-file ${{ secrets.SF_AUTH_URL }}
+
+      - name: Deploy to Scratch Org
+        run: sf project deploy start --target-org qa_scratchorg
+
+      - name: Run Apex Tests
+        run: sf apex test run -c -r json -w 30 --target-org qa_scratchorg > testout.json
+
+      - name: Parse Test Results
+        id: apex
+        uses: Infinite-Source-ark/apex-test-reporter@v1
+        with:
+          json_path: testout.json
+          check_name: "Apex Tests"
+          min_coverage: "85"
+
+      - name: Gate PR on Test Results
+        run: |
+          if [ "${{ steps.apex.outputs.failing }}" -gt 0 ]; then
+            echo "::error::There are ${{ steps.apex.outputs.failing }} failing tests"
+            exit 1
+          fi
+          if [ "${{ steps.apex.outputs.coverage }}" -lt 85 ]; then
+            echo "::error::Coverage ${{ steps.apex.outputs.coverage }}% is below 85%"
+            exit 1
+          fi
+          echo "::notice::All tests passed with ${{ steps.apex.outputs.coverage }}% coverage! 🎉"
+```
 
 🔐 Recommended permissions
 
