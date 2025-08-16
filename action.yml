@@ -40,7 +40,7 @@ runs:
   steps:
     - id: parse
       shell: bash
-      run: $GITHUB_ACTION_PATH/parse-and-publish.sh
+      run: $GITHUB_ACTION_PATH/scripts/parse-and-publish.sh
       env:
         JSON_PATH: ${{ inputs.json_path }}
         CHECK_NAME: ${{ inputs.check_name }}
