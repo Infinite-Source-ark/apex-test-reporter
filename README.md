@@ -7,6 +7,9 @@ Parses `sf apex test run -r json` output from Salesforce CLI, writes a clean Mar
 ## ✨ Features
 - Parses **Apex JSON** from `sf apex test run -r json`
 - Publishes a readable **summary** (pass/fail/skip/coverage)
+- **📊 Detailed class-level code coverage analysis** with visual indicators
+- **⚠️ Identifies classes needing coverage improvement** with specific targets
+- **🔍 Shows uncovered line numbers** for precise development guidance
 - Exposes handy **outputs** for PR gating or comments
 - Transparent & simple (Bash + `jq`)
 
@@ -34,25 +37,34 @@ Parses `sf apex test run -r json` output from Salesforce CLI, writes a clean Mar
     min_coverage: "85"
 ```
 
-### Advanced Usage with PR Gating
+### Advanced Usage with Coverage Analysis
 ```yaml
 - name: Run Apex tests (JSON)
   run: sf apex test run -c -r json -w 30 --target-org qa_scratchorg > testout.json
 
-- name: Parse Test Results
+- name: Parse Test Results with Coverage Analysis
   id: apex
   uses: Infinite-Source-ark/apex-test-reporter@v1
   with:
     json_path: testout.json
     check_name: "Apex Tests"
     min_coverage: "75"
+    coverage_threshold: "80"  # Individual class threshold
     max_failures: "25"
 
-- name: Check Coverage Threshold
+- name: Check Overall Coverage
   if: steps.apex.outputs.coverage < 75
   run: |
-    echo "::error::Code coverage (${{ steps.apex.outputs.coverage }}%) is below required threshold (75%)"
+    echo "::error::Org-wide coverage (${{ steps.apex.outputs.coverage }}%) is below required threshold (75%)"
     exit 1
+
+- name: Check Individual Class Coverage
+  if: steps.apex.outputs.low-coverage-classes > 0
+  run: |
+    echo "::warning::Found ${{ steps.apex.outputs.low-coverage-classes }} classes below 80% coverage"
+    echo "Worst coverage: ${{ steps.apex.outputs.worst-coverage-class }}"
+    # You can choose to fail or just warn
+    # exit 1
 
 - name: Check for Test Failures
   if: steps.apex.outputs.failing > 0
@@ -77,13 +89,32 @@ Parses `sf apex test run -r json` output from Salesforce CLI, writes a clean Mar
 | `passing` | Number of passing tests | `40` |
 | `failing` | Number of failing tests | `2` |
 | `skipped` | Number of skipped tests | `0` |
-| `coverage` | Test coverage percentage | `87` |
+| `coverage` | Org-wide test coverage percentage | `87` |
 | `outcome` | Overall test run outcome | `Failed` |
 | `summary-file` | Path to generated markdown summary | `/path/to/apex-summary.md` |
+| `low-coverage-classes` | Number of classes below coverage threshold | `3` |
+| `coverage-analysis` | Whether detailed coverage analysis is available | `true` |
+| `worst-coverage-class` | Class with the lowest coverage percentage | `AccountService` |
 
 ### Legacy Outputs (for backward compatibility)
 - `total` — same as `tests-ran`
 - `summary_file` — same as `summary-file`
+
+## 📊 Coverage Analysis Features
+
+When class-level coverage data is available, the action provides:
+
+### Visual Coverage Indicators
+- 🟢 **Excellent** (90%+): Classes with great coverage
+- 🟡 **Good** (75-89%): Classes meeting threshold  
+- 🟠 **Needs Work** (50-74%): Classes below threshold
+- 🔴 **Critical** (<50%): Classes requiring immediate attention
+
+### Detailed Analysis
+- **Per-class coverage table** with line counts and percentages
+- **Classes needing improvement** with specific targets
+- **Uncovered line numbers** for precise development guidance
+- **Configurable thresholds** for different coverage requirements
 
 ## 🚦 Example: Complete CI Workflow
 
