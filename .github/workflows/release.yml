@@ -4,9 +4,21 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., v1.1.0)'
+        required: true
+        type: string
+      prerelease:
+        description: 'Mark as pre-release'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   release:
@@ -17,35 +29,113 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ github.event.inputs.version }}"
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "tag_name=$VERSION" >> $GITHUB_OUTPUT
+          else
+            VERSION="${{ github.ref_name }}"
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "tag_name=$VERSION" >> $GITHUB_OUTPUT
+          fi
+          echo "Releasing version: $VERSION"
+
+      - name: Create tag for manual release
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Check if tag already exists
+          if git rev-parse "$VERSION" >/dev/null 2>&1; then
+            echo "Tag $VERSION already exists"
+          else
+            git tag "$VERSION"
+            git push origin "$VERSION"
+            echo "Created and pushed tag $VERSION"
+          fi
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          
+          # Create changelog content
+          cat > release_notes.md << 'EOF'
+          ## 🚀 What's New in ${{ steps.version.outputs.version }}
+          
+          ### ✨ Enhanced Code Coverage Analysis
+          - 📊 **Per-class coverage analysis** with visual status indicators (🟢🟡🟠🔴)
+          - ⚠️ **Identify classes needing improvement** with specific targets and line numbers
+          - 🔍 **Display uncovered line numbers** for precise development guidance
+          - 🎛️ **Configurable coverage thresholds** (org-wide and per-class)
+          
+          ### 🔧 New Features
+          - `coverage_threshold` input parameter (default: 75%)
+          - `low-coverage-classes` output - count of classes below threshold
+          - `coverage-analysis` output - whether detailed analysis is available
+          - `worst-coverage-class` output - class with lowest coverage
+          
+          ### 📈 Enhanced Reports
+          ```
+          ## 📊 Code Coverage by Class
+          | Class Name | Total Lines | Covered | Uncovered | Coverage % | Status |
+          |------------|-------------|---------|-----------|------------|--------|
+          | AccountService | 150 | 140 | 10 | 93% | 🟢 Excellent |
+          | ContactService | 100 | 80 | 20 | 80% | 🟡 Good |
+          | LeadService | 75 | 34 | 41 | 45% | 🔴 Critical |
+          ```
+          
+          ### 💡 Usage Example
+          ```yaml
+          - name: Parse Test Results with Coverage Analysis
+            uses: Infinite-Source-ark/apex-test-reporter@${{ steps.version.outputs.version }}
+            with:
+              json_path: testout.json
+              coverage_threshold: "80"  # Individual class threshold
+          
+          - name: Check Coverage Issues
+            if: steps.apex.outputs.low-coverage-classes > 0
+            run: |
+              echo "Found \${{ steps.apex.outputs.low-coverage-classes }} classes below threshold"
+              echo "Worst coverage: \${{ steps.apex.outputs.worst-coverage-class }}"
+          ```
+          
+          ### 🔄 Backward Compatibility
+          - All existing outputs and functionality preserved
+          - Legacy field names still supported
+          - Graceful fallback when coverage data unavailable
+          
+          **Full Changelog**: https://github.com/Infinite-Source-ark/apex-test-reporter/compare/v1.0.0...${{ steps.version.outputs.version }}
+          
+          ---
+          **Author:** uttam
+          EOF
+
       - name: Create Release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.ARK_GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          release_name: Release ${{ github.ref_name }}
-          body: |
-            ## What's Changed
-
-            This release includes improvements to the Apex Test Reporter GitHub Action.
-
-            ### Usage
-            ```yaml
-            - name: Parse Test Results
-              uses: Infinite-Source-ark/apex-test-reporter@${{ github.ref_name }}
-              with:
-                json_path: testout.json
-            ```
-
-            **Full Changelog**: https://github.com/Infinite-Source-ark/apex-test-reporter/compare/v1.0.0...${{ github.ref_name }}
+          tag_name: ${{ steps.version.outputs.tag_name }}
+          name: "Apex Test Reporter ${{ steps.version.outputs.version }}"
+          body_path: release_notes.md
           draft: false
-          prerelease: false
+          prerelease: ${{ github.event.inputs.prerelease || false }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Update major version tag
         run: |
-          VERSION=${{ github.ref_name }}
+          VERSION="${{ steps.version.outputs.version }}"
           MAJOR_VERSION=$(echo "$VERSION" | cut -d. -f1)
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -fa "$MAJOR_VERSION" -m "Update $MAJOR_VERSION tag"
+          
+          # Update major version tag (e.g., v1 -> v1.1.0)
+          git tag -fa "$MAJOR_VERSION" -m "Update $MAJOR_VERSION tag to $VERSION"
           git push origin "$MAJOR_VERSION" --force
+          echo "Updated major version tag $MAJOR_VERSION to point to $VERSION"
