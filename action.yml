@@ -17,6 +17,10 @@ inputs:
     description: "Coverage threshold to display"
     required: false
     default: "85"
+  coverage_threshold:
+    description: "Minimum code coverage percentage required for individual classes"
+    required: false
+    default: "75"
   max_failures:
     description: "Max failure entries to show (for huge runs)"
     required: false
@@ -44,6 +48,15 @@ outputs:
   summary-file:
     description: "Path to generated markdown summary file"
     value: ${{ steps.parse.outputs.summary-file }}
+  low-coverage-classes:
+    description: "Number of classes below coverage threshold"
+    value: ${{ steps.parse.outputs.low-coverage-classes }}
+  coverage-analysis:
+    description: "Detailed coverage analysis available (true/false)"
+    value: ${{ steps.parse.outputs.coverage-analysis }}
+  worst-coverage-class:
+    description: "Class with lowest coverage percentage"
+    value: ${{ steps.parse.outputs.worst-coverage-class }}
   # Legacy outputs for backward compatibility
   total:
     description: "Total tests run (legacy - use tests-ran)"
@@ -59,4 +72,5 @@ runs:
         JSON_PATH: ${{ inputs.json_path }}
         CHECK_NAME: ${{ inputs.check_name }}
         MIN_COVERAGE: ${{ inputs.min_coverage }}
+        COVERAGE_THRESHOLD: ${{ inputs.coverage_threshold }}
         MAX_FAILURES: ${{ inputs.max_failures }}
